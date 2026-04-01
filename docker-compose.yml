@@ -1,0 +1,77 @@
+# ============================================================
+# Architecture:
+#   443 (stream, SNI) ──► SNI = www.google.com     → 3x-ui:8443 (Xray Reality)
+#                    └──► SNI = YOUR_DOMAIN        → nginx:7443 (HTTPS)
+#
+#   nginx:7443 ──► /panel/    → 3x-ui:2053
+#             └──► /nginx-ui/ → nginx-ui:9000
+# ============================================================
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/sites-available:/etc/nginx/sites-available:rw
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
+      - ./nginx/html:/usr/share/nginx/html:rw
+      - ./certbot:/etc/letsencrypt:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - proxy
+    depends_on:
+      - 3x-ui
+      - nginx-ui
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    restart: unless-stopped
+    volumes:
+      - ./certbot:/etc/letsencrypt
+      - ./nginx/html:/usr/share/nginx/html
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /usr/share/nginx/html --quiet; sleep 12h & wait $${!}; done;'"
+    depends_on:
+      - nginx
+
+  # ── 3X-UI ────────────────────────────────────────────────
+  3x-ui:
+    image: ghcr.io/mhsanaei/3x-ui:latest
+    container_name: 3x-ui
+    restart: unless-stopped
+    volumes:
+      - ./3x-ui/db:/etc/x-ui
+      - ./3x-ui/cert:/root/cert
+    environment:
+      XRAY_VMESS_AEAD_FORCED: "false"
+    networks:
+      - proxy
+
+  # ── NGINX-UI ─────────────────────────────────────────────
+  nginx-ui:
+    image: uozi/nginx-ui:latest
+    container_name: nginx-ui
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:rw
+      - ./nginx/sites-available:/etc/nginx/sites-available:rw
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
+      - ./nginx-ui:/etc/nginx-ui
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    driver: bridge
+
+volumes:
+  nginx_logs:
