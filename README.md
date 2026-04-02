@@ -14,6 +14,7 @@
 
 ```bash
 curl -fLo install.sh https://raw.githubusercontent.com/dail45/docker-3x-ui-nginx-nginx-ui/refs/heads/master/install.sh
+chmod +x ./install.sh
 sudo bash install.sh
 ```
 
