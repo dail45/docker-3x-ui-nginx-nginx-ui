@@ -534,7 +534,7 @@ server {
 EOF
     ok "$MSG_FILE_CREATED nginx/conf.d/default.conf"
 
-    cat > "$NGINX_DIR/sites-available/${domain}.conf" << EOF
+    cat > "$NGINX_DIR/sites-available/${domain}" << EOF
 server {
     listen 7443 ssl;
     server_name ${domain};
@@ -579,10 +579,10 @@ server {
     }
 }
 EOF
-    ok "$MSG_FILE_CREATED nginx/sites-available/${domain}.conf"
+    ok "$MSG_FILE_CREATED nginx/sites-available/${domain}"
 
-    ln -sf "../sites-available/${domain}.conf" "$NGINX_DIR/sites-enabled/${domain}.conf"
-    ok "$MSG_SYMLINK_CREATED nginx/sites-enabled/${domain}.conf"
+    ln -sf "../sites-available/${domain}" "$NGINX_DIR/sites-enabled/${domain}"
+    ok "$MSG_SYMLINK_CREATED nginx/sites-enabled/${domain}"
 }
 
 generate_configs() {
