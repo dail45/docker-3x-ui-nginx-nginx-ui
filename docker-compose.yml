@@ -21,6 +21,7 @@ services:
       - ./nginx/sites-available:/etc/nginx/sites-available:rw
       - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
       - ./nginx/html:/usr/share/nginx/html:rw
+      - ./nginx/ssl:/etc/nginx/ssl:rw
       - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
@@ -40,7 +41,6 @@ services:
     depends_on:
       - nginx
 
-  # ── 3X-UI ────────────────────────────────────────────────
   3x-ui:
     image: ghcr.io/mhsanaei/3x-ui:latest
     container_name: 3x-ui
@@ -53,7 +53,6 @@ services:
     networks:
       - proxy
 
-  # ── NGINX-UI ─────────────────────────────────────────────
   nginx-ui:
     image: uozi/nginx-ui:latest
     container_name: nginx-ui
@@ -64,7 +63,9 @@ services:
       - ./nginx/sites-available:/etc/nginx/sites-available:rw
       - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
       - ./nginx-ui:/etc/nginx-ui
+      - ./nginx/ssl:/etc/nginx/ssl:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
       - proxy
