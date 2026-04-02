@@ -746,7 +746,7 @@ main() {
 
     echo -e ""
     echo -e "  ${C_GREEN}${C_BOLD}╔══════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "  ${C_GREEN}${C_BOLD}║          ✔  ${MSG_STEP_DONE}                    ║${C_RESET}"
+    echo -e "  ${C_GREEN}${C_BOLD}║          ✔  ${MSG_STEP_DONE}                 ║${C_RESET}"
     echo -e "  ${C_GREEN}${C_BOLD}╚══════════════════════════════════════════════════╝${C_RESET}"
     echo -e ""
     echo -e "  ${C_BOLD}${C_WHITE}🌐 $MSG_ACCESS${C_RESET}"
