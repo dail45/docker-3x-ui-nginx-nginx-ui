@@ -88,6 +88,7 @@ services:
       - ./nginx/sites-available:/etc/nginx/sites-available:rw
       - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
       - ./nginx/html:/usr/share/nginx/html:rw
+      - ./nginx/ssl:/etc/nginx/ssl:rw
       - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
@@ -129,7 +130,9 @@ services:
       - ./nginx/sites-available:/etc/nginx/sites-available:rw
       - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
       - ./nginx-ui:/etc/nginx-ui
+      - ./nginx/ssl:/etc/nginx/ssl:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
       - proxy
@@ -470,10 +473,18 @@ generate_vhost_conf() {
     cat > "$NGINX_DIR/conf.d/default.conf" << EOF
 server {
     listen 80;
-    server_name ${domain};
 
     location /.well-known/acme-challenge/ {
         root /usr/share/nginx/html;
+		try_files $uri @acme_proxy;
+    }
+	
+	location @acme_proxy {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
+        proxy_pass http://nginx-ui:9180;
     }
 
     location / {
