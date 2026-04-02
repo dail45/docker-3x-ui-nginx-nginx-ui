@@ -237,6 +237,26 @@ choose_language() {
             MSG_NGINX_RELOAD="Перезапуск Nginx с боевыми сертификатами..."
             MSG_ACCESS="ДОСТУП"
             MSG_HINT_LOG="Логи установки:"
+            MSG_SYMLINK_CREATED="Создан симлинк:"
+            MSG_ERR_ROOT="Запустите скрипт от имени root (sudo)"
+            MSG_ERR_DOCKER_MISSING="Docker не найден. Сначала установите Docker."
+            MSG_ERR_DOCKER_DAEMON="Демон Docker не запущен."
+            MSG_ERR_COMPOSE_MISSING="Docker Compose не найден."
+            MSG_WARN_CURL_INSTALL="curl не найден, устанавливаем..."
+            MSG_ERR_CURL_FAIL="Не удалось установить curl"
+            MSG_WARN_OPENSSL_INSTALL="openssl не найден, устанавливаем..."
+            MSG_ERR_OPENSSL_FAIL="Не удалось установить openssl"
+            MSG_INFO_MIME_DL="Скачивание mime.types..."
+            MSG_WARN_MIME_FAIL="Не удалось скачать mime.types (в nginx:alpine используется встроенный)"
+            MSG_INFO_DUMMY_GEN="Генерация временных сертификатов для"
+            MSG_OK_DUMMY_READY="Временные сертификаты готовы"
+            MSG_INFO_DUMMY_RM="Удаление временных сертификатов..."
+            MSG_INFO_CERT_REQ="Запрос сертификата Let's Encrypt..."
+            MSG_ERR_CERT_FAIL="Ошибка выпуска сертификата. Проверьте логи:"
+            MSG_OK_CERT_DONE="Сертификат Let's Encrypt получен"
+            MSG_ERR_3XUI_TIMEOUT="3x-ui не создал базу данных за 30с. Проверьте:"
+            MSG_OK_STACK_RUN="Стек контейнеров запущен"
+            MSG_OK_NGINX_RELOAD="Конфигурация Nginx перезагружена"
             ;;
         *)
             MSG_ERROR="ERROR"
@@ -272,6 +292,26 @@ choose_language() {
             MSG_NGINX_RELOAD="Reloading Nginx with real certificates..."
             MSG_ACCESS="ACCESS"
             MSG_HINT_LOG="Installation log:"
+            MSG_SYMLINK_CREATED="Created symlink:"
+            MSG_ERR_ROOT="Run this script as root (sudo)"
+            MSG_ERR_DOCKER_MISSING="Docker not found. Please install Docker first."
+            MSG_ERR_DOCKER_DAEMON="Docker daemon is not running."
+            MSG_ERR_COMPOSE_MISSING="Docker Compose not found."
+            MSG_WARN_CURL_INSTALL="curl not found, installing..."
+            MSG_ERR_CURL_FAIL="Failed to install curl"
+            MSG_WARN_OPENSSL_INSTALL="openssl not found, installing..."
+            MSG_ERR_OPENSSL_FAIL="Failed to install openssl"
+            MSG_INFO_MIME_DL="Downloading mime.types..."
+            MSG_WARN_MIME_FAIL="Could not download mime.types (nginx:alpine ships its own)"
+            MSG_INFO_DUMMY_GEN="Generating dummy certificates for"
+            MSG_OK_DUMMY_READY="Dummy certificates ready"
+            MSG_INFO_DUMMY_RM="Removing dummy certificates..."
+            MSG_INFO_CERT_REQ="Requesting Let's Encrypt certificate..."
+            MSG_ERR_CERT_FAIL="Certificate issuance failed. Check logs:"
+            MSG_OK_CERT_DONE="Let's Encrypt certificate obtained"
+            MSG_ERR_3XUI_TIMEOUT="3x-ui did not create the database within 30s. Check:"
+            MSG_OK_STACK_RUN="Stack is running"
+            MSG_OK_NGINX_RELOAD="Nginx reloaded"
             ;;
     esac
 }
@@ -282,14 +322,14 @@ choose_language() {
 
 check_root() {
     info "$MSG_CHECK_ROOT"
-    test "$EUID" -eq 0 || fail "Run this script as root (sudo)"
+    test "$EUID" -eq 0 || fail "$MSG_ERR_ROOT"
     ok "$MSG_CHECK_ROOT"
 }
 
 check_docker() {
     info "$MSG_CHECK_DOCKER"
-    command -v "$DOCKER_CMD" &>/dev/null || fail "Docker not found. Please install Docker first."
-    "$DOCKER_CMD" info &>/dev/null        || fail "Docker daemon is not running."
+    command -v "$DOCKER_CMD" &>/dev/null || fail "$MSG_ERR_DOCKER_MISSING"
+    "$DOCKER_CMD" info &>/dev/null        || fail "$MSG_ERR_DOCKER_DAEMON"
     ok "$MSG_CHECK_DOCKER"
 }
 
@@ -305,14 +345,14 @@ check_docker_compose() {
         warn "$MSG_CHECK_COMPOSE (v1 legacy)"
         return 0
     fi
-    fail "Docker Compose not found."
+    fail "$MSG_ERR_COMPOSE_MISSING"
 }
 
 check_curl() {
     info "$MSG_CHECK_CURL"
     if ! command -v curl &>/dev/null; then
-        warn "curl not found, installing..."
-        apt-get update -qq && apt-get install -y -qq curl || fail "Failed to install curl"
+        warn "$MSG_WARN_CURL_INSTALL"
+        apt-get update -qq && apt-get install -y -qq curl || fail "$MSG_ERR_CURL_FAIL"
     fi
     ok "$MSG_CHECK_CURL"
 }
@@ -320,8 +360,8 @@ check_curl() {
 check_openssl() {
     info "$MSG_CHECK_OPENSSL"
     if ! command -v openssl &>/dev/null; then
-        warn "openssl not found, installing..."
-        apt-get update -qq && apt-get install -y -qq openssl || fail "Failed to install openssl"
+        warn "$MSG_WARN_OPENSSL_INSTALL"
+        apt-get update -qq && apt-get install -y -qq openssl || fail "$MSG_ERR_OPENSSL_FAIL"
     fi
     ok "$MSG_CHECK_OPENSSL"
 }
@@ -478,12 +518,12 @@ server {
         root /usr/share/nginx/html;
 		try_files \$uri @acme_proxy;
     }
-	
+
 	location @acme_proxy {
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        
+
         proxy_pass http://nginx-ui:9180;
     }
 
@@ -491,7 +531,10 @@ server {
         return 301 https://\$host\$request_uri;
     }
 }
+EOF
+    ok "$MSG_FILE_CREATED nginx/conf.d/default.conf"
 
+    cat > "$NGINX_DIR/sites-available/${domain}.conf" << EOF
 server {
     listen 7443 ssl;
     server_name ${domain};
@@ -536,7 +579,10 @@ server {
     }
 }
 EOF
-    ok "$MSG_FILE_CREATED nginx/conf.d/default.conf"
+    ok "$MSG_FILE_CREATED nginx/sites-available/${domain}.conf"
+
+    ln -sf "../sites-available/${domain}.conf" "$NGINX_DIR/sites-enabled/${domain}.conf"
+    ok "$MSG_SYMLINK_CREATED nginx/sites-enabled/${domain}.conf"
 }
 
 generate_configs() {
@@ -562,7 +608,7 @@ generate_configs() {
 
 setup_dummy_certs() {
     local domain="$1"
-    info "Generating dummy certificates for $domain..."
+    info "$MSG_INFO_DUMMY_GEN $domain..."
 
     mkdir -p "$CERTBOT_DIR/live/$domain"
 
@@ -578,19 +624,19 @@ setup_dummy_certs() {
             -o "$CERTBOT_DIR/ssl-dhparams.pem"
     fi
 
-    ok "Dummy certificates ready"
+    ok "$MSG_OK_DUMMY_READY"
 }
 
 get_real_certs() {
     local domain="$1"
     local email="$2"
 
-    info "Removing dummy certificates..."
+    info "$MSG_INFO_DUMMY_RM"
     rm -rf "$CERTBOT_DIR/live/$domain"
     rm -rf "$CERTBOT_DIR/archive/$domain"
     rm -f  "$CERTBOT_DIR/renewal/$domain.conf"
 
-    info "Requesting Let's Encrypt certificate..."
+    info "$MSG_INFO_CERT_REQ"
     $COMPOSE_CMD run --rm --no-deps --entrypoint certbot certbot certonly \
         --webroot -w /usr/share/nginx/html \
         --email "$email" \
@@ -600,7 +646,7 @@ get_real_certs() {
         --force-renewal \
         -d "$domain" || fail "Certificate issuance failed. Check logs: $COMPOSE_CMD logs nginx"
 
-    ok "Let's Encrypt certificate obtained"
+    ok "$MSG_OK_CERT_DONE"
 }
 
 # ============================================================================
@@ -614,8 +660,7 @@ configure_3xui_basepath() {
     local retries=0
     until docker exec 3x-ui test -f /etc/x-ui/x-ui.db 2>/dev/null; do
         retries=$((retries + 1))
-        test "$retries" -ge 15 && fail "3x-ui did not create the database within 30s. Check: $COMPOSE_CMD logs 3x-ui"
-        printf "."
+        test "$retries" -ge 15 && fail "$MSG_ERR_3XUI_TIMEOUT $COMPOSE_CMD logs 3x-ui"printf "."
         sleep 2
     done
     echo ""
@@ -686,7 +731,7 @@ main() {
     info "$MSG_STARTING_STACK"
     $COMPOSE_CMD up -d --build
     sleep 5
-    ok "Stack is running"
+    ok "$MSG_OK_STACK_RUN"
 
     step "$MSG_STEP_3XUI"
     divider
@@ -697,7 +742,7 @@ main() {
     get_real_certs "$domain" "$email"
     info "$MSG_NGINX_RELOAD"
     $COMPOSE_CMD restart nginx
-    ok "Nginx reloaded"
+    ok "$MSG_OK_NGINX_RELOAD"
 
     echo -e ""
     echo -e "  ${C_GREEN}${C_BOLD}╔══════════════════════════════════════════════════╗${C_RESET}"
