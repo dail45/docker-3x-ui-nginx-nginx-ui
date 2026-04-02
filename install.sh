@@ -476,13 +476,13 @@ server {
 
     location /.well-known/acme-challenge/ {
         root /usr/share/nginx/html;
-		try_files $uri @acme_proxy;
+		try_files \$uri @acme_proxy;
     }
 	
 	location @acme_proxy {
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         
         proxy_pass http://nginx-ui:9180;
     }
