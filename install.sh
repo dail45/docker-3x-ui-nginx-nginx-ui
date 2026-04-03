@@ -194,6 +194,7 @@ choose_language() {
             MSG_CHECK_CURL="Проверка curl"
             MSG_CHECK_OPENSSL="Проверка openssl"
             MSG_CHECK_DNS="Проверка DNS для"
+            MSG_PROMPT_EMAIL="  Введите email для Let's Encrypt: "
             MSG_PROMPT_DOMAIN="  Введите домен"
             MSG_DIR_EXISTS="Уже существует:"
             MSG_DIR_CREATED="Создана директория:"
@@ -247,6 +248,7 @@ choose_language() {
             MSG_CHECK_CURL="Checking curl"
             MSG_CHECK_OPENSSL="Checking openssl"
             MSG_CHECK_DNS="Checking DNS for"
+            MSG_PROMPT_EMAIL="  Enter email for Let's Encrypt: "
             MSG_PROMPT_DOMAIN="  Enter your domain"
             MSG_DIR_EXISTS="Already exists:"
             MSG_DIR_CREATED="Created directory:"
@@ -593,6 +595,33 @@ setup_dummy_certs() {
     ok "$MSG_OK_DUMMY_READY"
 }
 
+get_real_certs() {
+    local domain="$1"
+    local email="$2"
+
+    info "$MSG_INFO_DUMMY_RM"
+    rm -f "$NGINX_DIR/ssl/$domain/fullchain.pem"
+    rm -f "$NGINX_DIR/ssl/$domain/privkey.pem"
+
+    info "$MSG_INFO_CERT_REQ"
+    docker run --rm --name temp_certbot \
+        -v "$NGINX_DIR/html:/usr/share/nginx/html" \
+        -v "$SCRIPT_DIR/certbot_temp:/etc/letsencrypt" \
+        certbot/certbot certonly \
+        --webroot -w /usr/share/nginx/html \
+        --email "$email" \
+        --agree-tos \
+        --no-eff-email \
+        --non-interactive \
+        -d "$domain" || fail "$MSG_ERR_CERT_FAIL temp_certbot"
+
+    cp -L "$SCRIPT_DIR/certbot_temp/live/$domain/fullchain.pem" "$NGINX_DIR/ssl/$domain/fullchain.pem"
+    cp -L "$SCRIPT_DIR/certbot_temp/live/$domain/privkey.pem" "$NGINX_DIR/ssl/$domain/privkey.pem"
+    rm -rf "$SCRIPT_DIR/certbot_temp"
+
+    ok "$MSG_OK_CERT_DONE"
+}
+
 # ============================================================================
 # 3X-UI CONFIGURATION
 # ============================================================================
@@ -648,6 +677,8 @@ main() {
     local hostname
     hostname=$(hostname)
     echo ""
+    printf "$MSG_PROMPT_EMAIL"
+    read -r email
     printf "$MSG_PROMPT_DOMAIN (default: $hostname): "
     read -r user_domain
     local domain="${user_domain:-$hostname}"
@@ -679,12 +710,17 @@ main() {
     divider
     configure_3xui_basepath
 
+    step "$MSG_STEP_CERTS_REAL"
+    divider
+    get_real_certs "$domain" "$email"
+    info "$MSG_NGINX_RELOAD"
+    $COMPOSE_CMD restart nginx-ui
+    ok "$MSG_OK_NGINX_RELOAD"
+
     echo -e ""
     echo -e "  ${C_GREEN}${C_BOLD}╔══════════════════════════════════════════════════╗${C_RESET}"
     echo -e "  ${C_GREEN}${C_BOLD}║          ✔  ${MSG_STEP_DONE}                  ║${C_RESET}"
     echo -e "  ${C_GREEN}${C_BOLD}╚══════════════════════════════════════════════════╝${C_RESET}"
-    echo -e ""
-    echo -e "  ${C_YELLOW}⚠  NOTE: SSL certificates are self-signed. Log in to Nginx-UI to issue Let's Encrypt certificates.${C_RESET}"
     echo -e ""
     echo -e "  ${C_BOLD}${C_WHITE}🌐 $MSG_ACCESS${C_RESET}"
     echo -e ""
