@@ -187,6 +187,7 @@ choose_language() {
             MSG_STEP_CERTS_DUMMY="Временные SSL-сертификаты"
             MSG_STEP_STACK="Запуск стека Docker"
             MSG_STEP_3XUI="Настройка 3x-ui"
+            MSG_STEP_CERTS_REAL="Получение сертификатов Let's Encrypt"
             MSG_STEP_DONE="Установка завершена"
             MSG_CHECK_ROOT="Проверка прав root"
             MSG_CHECK_DOCKER="Проверка Docker"
