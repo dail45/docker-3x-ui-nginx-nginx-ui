@@ -241,6 +241,7 @@ choose_language() {
             MSG_STEP_CERTS_DUMMY="Dummy SSL certificates"
             MSG_STEP_STACK="Starting Docker stack"
             MSG_STEP_3XUI="Configuring 3x-ui"
+            MSG_STEP_CERTS_REAL="Obtaining Let's Encrypt certificates"
             MSG_STEP_DONE="Installation complete"
             MSG_CHECK_ROOT="Checking root privileges"
             MSG_CHECK_DOCKER="Checking Docker"
@@ -730,6 +731,10 @@ main() {
     divider
     echo -e "  ${C_DIM}📄 $MSG_HINT_LOG ${LOG_FILE}${C_RESET}"
     echo -e ""
+}
+
+main "$@"
+ ""
 }
 
 main "$@"
