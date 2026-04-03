@@ -8,17 +8,6 @@
 # ============================================================
 
 services:
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    restart: unless-stopped
-    volumes:
-      - ./certbot:/etc/letsencrypt
-      - ./nginx/html:/usr/share/nginx/html
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /usr/share/nginx/html --quiet; sleep 12h & wait $${!}; done;'"
-    depends_on:
-      - nginx-ui
-
   3x-ui:
     image: ghcr.io/mhsanaei/3x-ui:latest
     container_name: 3x-ui
@@ -48,7 +37,6 @@ services:
       - ./nginx/html:/usr/share/nginx/html:rw
       - ./nginx-ui:/etc/nginx-ui
       - ./nginx/ssl:/etc/nginx/ssl:rw
-      - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
       - proxy

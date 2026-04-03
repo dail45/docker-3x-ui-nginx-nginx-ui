@@ -10,7 +10,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/install.log"
 NGINX_DIR="$SCRIPT_DIR/nginx"
 NGINX_UI_DIR="$SCRIPT_DIR/nginx-ui"
-CERTBOT_DIR="$SCRIPT_DIR/certbot"
 XRAY_SNI="www.google.com"
 
 DOCKER_CMD="docker"
@@ -31,7 +30,7 @@ tmpl_required_dirs() {
         "$NGINX_DIR/streams-available" \
         "$NGINX_DIR/streams-enabled" \
         "$NGINX_UI_DIR" \
-        "$CERTBOT_DIR"
+        "$NGINX_DIR/ssl"
 }
 
 tmpl_index_html() {
@@ -77,17 +76,6 @@ HTMLEOF
 tmpl_docker_compose() {
     cat << 'DCEOF'
 services:
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    restart: unless-stopped
-    volumes:
-      - ./certbot:/etc/letsencrypt
-      - ./nginx/html:/usr/share/nginx/html
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /usr/share/nginx/html --quiet; sleep 12h & wait $${!}; done;'"
-    depends_on:
-      - nginx-ui
-
   3x-ui:
     image: ghcr.io/mhsanaei/3x-ui:latest
     container_name: 3x-ui
@@ -117,7 +105,6 @@ services:
       - ./nginx/html:/usr/share/nginx/html:rw
       - ./nginx-ui:/etc/nginx-ui
       - ./nginx/ssl:/etc/nginx/ssl:rw
-      - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
       - proxy
@@ -177,7 +164,7 @@ choose_language() {
     clear
     echo -e ""
     echo -e "  ${C_BOLD}${C_WHITE}╔══════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "  ${C_BOLD}${C_WHITE}║   3x-ui + Nginx + Nginx-UI + Certbot Installer  ║${C_RESET}"
+    echo -e "  ${C_BOLD}${C_WHITE}║   3x-ui + Nginx + Nginx-UI Installer            ║${C_RESET}"
     echo -e "  ${C_BOLD}${C_WHITE}╚══════════════════════════════════════════════════╝${C_RESET}"
     echo -e ""
     echo -e "  ${C_CYAN}Select language / Выберите язык:${C_RESET}"
@@ -198,7 +185,6 @@ choose_language() {
             MSG_STEP_CERTS_DUMMY="Временные SSL-сертификаты"
             MSG_STEP_STACK="Запуск стека Docker"
             MSG_STEP_3XUI="Настройка 3x-ui"
-            MSG_STEP_CERTS_REAL="Получение сертификатов Let's Encrypt"
             MSG_STEP_DONE="Установка завершена"
             MSG_CHECK_ROOT="Проверка прав root"
             MSG_CHECK_DOCKER="Проверка Docker"
@@ -206,7 +192,6 @@ choose_language() {
             MSG_CHECK_CURL="Проверка curl"
             MSG_CHECK_OPENSSL="Проверка openssl"
             MSG_CHECK_DNS="Проверка DNS для"
-            MSG_PROMPT_EMAIL="  Введите email для Let's Encrypt: "
             MSG_PROMPT_DOMAIN="  Введите домен"
             MSG_DIR_EXISTS="Уже существует:"
             MSG_DIR_CREATED="Создана директория:"
@@ -253,7 +238,6 @@ choose_language() {
             MSG_STEP_CERTS_DUMMY="Dummy SSL certificates"
             MSG_STEP_STACK="Starting Docker stack"
             MSG_STEP_3XUI="Configuring 3x-ui"
-            MSG_STEP_CERTS_REAL="Obtaining Let\'s Encrypt certificates"
             MSG_STEP_DONE="Installation complete"
             MSG_CHECK_ROOT="Checking root privileges"
             MSG_CHECK_DOCKER="Checking Docker"
@@ -261,7 +245,6 @@ choose_language() {
             MSG_CHECK_CURL="Checking curl"
             MSG_CHECK_OPENSSL="Checking openssl"
             MSG_CHECK_DNS="Checking DNS for"
-            MSG_PROMPT_EMAIL="  Enter email for Let\'s Encrypt: "
             MSG_PROMPT_DOMAIN="  Enter your domain"
             MSG_DIR_EXISTS="Already exists:"
             MSG_DIR_CREATED="Created directory:"
@@ -598,43 +581,14 @@ setup_dummy_certs() {
     local domain="$1"
     info "$MSG_INFO_DUMMY_GEN $domain..."
 
-    mkdir -p "$CERTBOT_DIR/live/$domain"
+    mkdir -p "$NGINX_DIR/ssl/$domain"
 
     openssl req -x509 -nodes -days 30 -newkey rsa:2048 \
-        -keyout "$CERTBOT_DIR/live/$domain/privkey.pem" \
-        -out    "$CERTBOT_DIR/live/$domain/fullchain.pem" \
+        -keyout "$NGINX_DIR/ssl/$domain/privkey.pem" \
+        -out    "$NGINX_DIR/ssl/$domain/fullchain.pem" \
         -subj   "/CN=$domain" 2>/dev/null
 
-    if ! test -f "$CERTBOT_DIR/options-ssl-nginx.conf"; then
-        curl -sL https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf \
-            -o "$CERTBOT_DIR/options-ssl-nginx.conf"
-        curl -sL https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem \
-            -o "$CERTBOT_DIR/ssl-dhparams.pem"
-    fi
-
     ok "$MSG_OK_DUMMY_READY"
-}
-
-get_real_certs() {
-    local domain="$1"
-    local email="$2"
-
-    info "$MSG_INFO_DUMMY_RM"
-    rm -rf "$CERTBOT_DIR/live/$domain"
-    rm -rf "$CERTBOT_DIR/archive/$domain"
-    rm -f  "$CERTBOT_DIR/renewal/$domain.conf"
-
-    info "$MSG_INFO_CERT_REQ"
-    $COMPOSE_CMD run --rm --no-deps --entrypoint certbot certbot certonly \
-        --webroot -w /usr/share/nginx/html \
-        --email "$email" \
-        --agree-tos \
-        --no-eff-email \
-        --non-interactive \
-        --force-renewal \
-        -d "$domain" || fail "Certificate issuance failed. Check logs: $COMPOSE_CMD logs nginx-ui"
-
-    ok "$MSG_OK_CERT_DONE"
 }
 
 # ============================================================================
@@ -672,7 +626,7 @@ main() {
 
     echo -e ""
     echo -e "  ${C_BOLD}${C_WHITE}╔══════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "  ${C_BOLD}${C_WHITE}║   3x-ui + Nginx + Nginx-UI + Certbot Installer   ║${C_RESET}"
+    echo -e "  ${C_BOLD}${C_WHITE}║   3x-ui + Nginx + Nginx-UI Installer             ║${C_RESET}"
     echo -e "  ${C_BOLD}${C_WHITE}╚══════════════════════════════════════════════════╝${C_RESET}"
     echo -e ""
 
@@ -692,8 +646,6 @@ main() {
     local hostname
     hostname=$(hostname)
     echo ""
-    printf "$MSG_PROMPT_EMAIL"
-    read -r email
     printf "$MSG_PROMPT_DOMAIN (default: $hostname): "
     read -r user_domain
     local domain="${user_domain:-$hostname}"
@@ -725,17 +677,12 @@ main() {
     divider
     configure_3xui_basepath
 
-    step "$MSG_STEP_CERTS_REAL"
-    divider
-    get_real_certs "$domain" "$email"
-    info "$MSG_NGINX_RELOAD"
-    $COMPOSE_CMD restart nginx-ui
-    ok "$MSG_OK_NGINX_RELOAD"
-
     echo -e ""
     echo -e "  ${C_GREEN}${C_BOLD}╔══════════════════════════════════════════════════╗${C_RESET}"
     echo -e "  ${C_GREEN}${C_BOLD}║          ✔  ${MSG_STEP_DONE}                  ║${C_RESET}"
     echo -e "  ${C_GREEN}${C_BOLD}╚══════════════════════════════════════════════════╝${C_RESET}"
+    echo -e ""
+    echo -e "  ${C_YELLOW}⚠  NOTE: SSL certificates are self-signed. Log in to Nginx-UI to issue Let's Encrypt certificates.${C_RESET}"
     echo -e ""
     echo -e "  ${C_BOLD}${C_WHITE}🌐 $MSG_ACCESS${C_RESET}"
     echo -e ""
@@ -748,3 +695,17 @@ main() {
 }
 
 main "$@"
+
+e ""
+    echo -e "  ${C_BOLD}${C_WHITE}🌐 $MSG_ACCESS${C_RESET}"
+    echo -e ""
+    echo -e "    ${C_CYAN}3x-ui panel  →${C_RESET}  https://${domain}/3x-ui-panel/"
+    echo -e "    ${C_CYAN}Nginx-UI     →${C_RESET}  https://${domain}/nginx-ui/"
+    echo -e ""
+    divider
+    echo -e "  ${C_DIM}📄 $MSG_HINT_LOG ${LOG_FILE}${C_RESET}"
+    echo -e ""
+}
+
+main "$@"
+
