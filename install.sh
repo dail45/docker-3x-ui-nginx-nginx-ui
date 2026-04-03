@@ -28,6 +28,8 @@ tmpl_required_dirs() {
         "$NGINX_DIR/html" \
         "$NGINX_DIR/sites-available" \
         "$NGINX_DIR/sites-enabled" \
+        "$NGINX_DIR/streams-available" \
+        "$NGINX_DIR/streams-enabled" \
         "$NGINX_UI_DIR" \
         "$CERTBOT_DIR"
 }
@@ -75,28 +77,6 @@ HTMLEOF
 tmpl_docker_compose() {
     cat << 'DCEOF'
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/sites-available:/etc/nginx/sites-available:rw
-      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
-      - ./nginx/html:/usr/share/nginx/html:rw
-      - ./nginx/ssl:/etc/nginx/ssl:rw
-      - ./certbot:/etc/letsencrypt:ro
-      - nginx_logs:/var/log/nginx
-    networks:
-      - proxy
-    depends_on:
-      - 3x-ui
-      - nginx-ui
-
   certbot:
     image: certbot/certbot
     container_name: certbot
@@ -106,7 +86,7 @@ services:
       - ./nginx/html:/usr/share/nginx/html
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /usr/share/nginx/html --quiet; sleep 12h & wait $${!}; done;'"
     depends_on:
-      - nginx
+      - nginx-ui
 
   3x-ui:
     image: ghcr.io/mhsanaei/3x-ui:latest
@@ -124,18 +104,25 @@ services:
     image: uozi/nginx-ui:latest
     container_name: nginx-ui
     restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:rw
       - ./nginx/conf.d:/etc/nginx/conf.d:rw
       - ./nginx/sites-available:/etc/nginx/sites-available:rw
       - ./nginx/sites-enabled:/etc/nginx/sites-enabled:rw
+      - ./nginx/streams-available:/etc/nginx/streams-available:rw
+      - ./nginx/streams-enabled:/etc/nginx/streams-enabled:rw
+      - ./nginx/html:/usr/share/nginx/html:rw
       - ./nginx-ui:/etc/nginx-ui
       - ./nginx/ssl:/etc/nginx/ssl:rw
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./certbot:/etc/letsencrypt:ro
       - nginx_logs:/var/log/nginx
     networks:
       - proxy
+    depends_on:
+      - 3x-ui
 
 networks:
   proxy:
@@ -153,7 +140,6 @@ HttpPort = 9000
 RunMode = release
 
 [nginx]
-ContainerName = nginx
 AccessLogPath = /var/log/nginx/access.log
 
 [auth]
@@ -471,6 +457,8 @@ stream {
         proxy_timeout 600s;
         proxy_buffer_size 16k;
     }
+
+    include /etc/nginx/streams-enabled/*;
 }
 
 http {
@@ -644,7 +632,7 @@ get_real_certs() {
         --no-eff-email \
         --non-interactive \
         --force-renewal \
-        -d "$domain" || fail "Certificate issuance failed. Check logs: $COMPOSE_CMD logs nginx"
+        -d "$domain" || fail "Certificate issuance failed. Check logs: $COMPOSE_CMD logs nginx-ui"
 
     ok "$MSG_OK_CERT_DONE"
 }
@@ -741,7 +729,7 @@ main() {
     divider
     get_real_certs "$domain" "$email"
     info "$MSG_NGINX_RELOAD"
-    $COMPOSE_CMD restart nginx
+    $COMPOSE_CMD restart nginx-ui
     ok "$MSG_OK_NGINX_RELOAD"
 
     echo -e ""
