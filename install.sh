@@ -512,10 +512,10 @@ server {
 
     port_in_redirect off;
 
-    ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
-    include             /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+    ssl_certificate     /etc/nginx/ssl/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/${domain}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
 
     add_header Strict-Transport-Security "max-age=63072000" always;
 
@@ -695,17 +695,3 @@ main() {
 }
 
 main "$@"
-
-e ""
-    echo -e "  ${C_BOLD}${C_WHITE}🌐 $MSG_ACCESS${C_RESET}"
-    echo -e ""
-    echo -e "    ${C_CYAN}3x-ui panel  →${C_RESET}  https://${domain}/3x-ui-panel/"
-    echo -e "    ${C_CYAN}Nginx-UI     →${C_RESET}  https://${domain}/nginx-ui/"
-    echo -e ""
-    divider
-    echo -e "  ${C_DIM}📄 $MSG_HINT_LOG ${LOG_FILE}${C_RESET}"
-    echo -e ""
-}
-
-main "$@"
-
