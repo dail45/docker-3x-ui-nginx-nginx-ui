@@ -24,6 +24,8 @@ services:
     image: uozi/nginx-ui:latest
     container_name: nginx-ui
     restart: unless-stopped
+    environment:
+      - NGINX_UI_IGNORE_DOCKER_SOCKET=true
     ports:
       - "80:80"
       - "443:443"
