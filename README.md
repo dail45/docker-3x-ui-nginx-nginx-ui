@@ -13,9 +13,9 @@
 [EN] You can install the project with a command (`curl` required):
 
 ```bash
-curl -fLo install.sh https://raw.githubusercontent.com/dail45/docker-3x-ui-nginx-nginx-ui/refs/heads/master/install.sh
-chmod +x ./install.sh
-sudo bash install.sh
+curl -fLo install.sh https://raw.githubusercontent.com/dail45/docker-3x-ui-nginx-nginx-ui/refs/heads/master/install-dialog.sh
+chmod +x ./install-dialog.sh
+sudo bash install-dialog.sh
 ```
 
 ---
